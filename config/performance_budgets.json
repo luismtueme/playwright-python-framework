@@ -1,0 +1,15 @@
+{
+  "$comment": "Performance budgets per page (ms, except cls). 'default' applies to every page; entries under 'pages' override it. Keep them loose enough for noisy CI machines, tight enough to catch a real regression.",
+  "default": {
+    "ttfb": 500,
+    "domContentLoaded": 1500,
+    "load": 2500,
+    "lcp": 2500,
+    "cls": 0.1
+  },
+  "pages": {
+    "/items": {
+      "load": 3000
+    }
+  }
+}

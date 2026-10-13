@@ -1,0 +1,215 @@
+name: Playwright
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run python -m utils.lint_tests
+      - run: uv run python -m utils.generate_api_types --check
+      - run: uv run pytest unit --cov=config --cov=demo_app --cov=utils --cov=contracts --cov-fail-under=90 --cov-report=term-missing
+      - name: Dependency audit
+        run: |
+          uv export --frozen --no-dev --format requirements-txt --output-file /tmp/requirements.txt
+          uvx pip-audit --requirement /tmp/requirements.txt
+
+  burn-in:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: uv sync --frozen
+      - run: uv run playwright install --with-deps chromium
+      - name: Repeat changed tests
+        env:
+          CI: "true"
+          HEADLESS: "true"
+          RETRIES: "0"
+        run: |
+          files=$(uv run python -m utils.affected "origin/${{ github.base_ref }}")
+          echo "$files"
+          if [ "$files" = "ALL" ] || [ -z "$files" ]; then
+            echo "No isolated test files to burn in."
+            exit 0
+          fi
+          # shellcheck disable=SC2086
+          uv run pytest $files --count 10 --reruns 0 -m "not visual"
+
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: demo
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      CI: "true"
+      HEADLESS: "true"
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_USER: test
+      DB_PASSWORD: test
+      DB_NAME: demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: uv sync --frozen
+      - run: uv run playwright install --with-deps chromium
+      - name: Sharded suite
+        run: uv run pytest tests --splits 4 --group ${{ matrix.shard }} --junitxml=test-results/junit.xml -m "not visual"
+      - name: Leftover data
+        if: always()
+        run: uv run python -m utils.check_leftover_data
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-shard-${{ matrix.shard }}
+          path: |
+            test-results/report.json
+            test-results/junit.xml
+          if-no-files-found: ignore
+
+  quarantine:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      CI: "true"
+      HEADLESS: "true"
+      PW_SUITE: quarantine
+      RETRIES: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: uv sync --frozen
+      - run: uv run playwright install --with-deps chromium
+      - run: uv run pytest tests --reruns 0
+
+  visual:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.63.0-noble
+    env:
+      CI: "true"
+      HEADLESS: "true"
+      IN_DOCKER: "true"
+      PW_SUITE: visual
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        run: pip install --quiet uv
+      - run: uv sync --frozen
+      - name: Compare screenshots
+        run: uv run python -m utils.visual
+
+  summary:
+    if: always() && github.event_name == 'pull_request'
+    needs: [checks, burn-in, tests, quarantine, visual]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: uv sync --frozen
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: report-shard-*
+          path: reports
+      - name: Render summary
+        env:
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          mapfile -t files < <(find reports -name report.json | sort)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "<!-- playwright-summary -->" > /tmp/summary.md
+            echo "### Playwright" >> /tmp/summary.md
+            echo "No shard report was uploaded." >> /tmp/summary.md
+          else
+            uv run python -m utils.pr_summary "${files[@]}" > /tmp/summary.md
+          fi
+      - name: Comment on the pull request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- playwright-summary -->';
+            const body = fs.readFileSync('/tmp/summary.md', 'utf8');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((comment) => (comment.body || '').includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

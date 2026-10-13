@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  Demo app: form page. Served by demo-app/server.js at "/".
+  Used by the example form scenarios and specs.
+-->
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Example Application</title>
+    </head>
+    <body>
+        <nav><a href="/login">Log in</a></nav>
+        <main>
+            <h1>Example Application</h1>
+
+            <section aria-label="Example action">
+                <button type="button" id="example-button">Run example action</button>
+                <p id="result" hidden>Example action completed</p>
+            </section>
+
+            <form id="example-form" novalidate>
+                <label for="example-input">Example input</label>
+                <input id="example-input" name="example" type="text" />
+                <button type="submit">Submit</button>
+            </form>
+            <p id="message" role="status"></p>
+        </main>
+
+        <script>
+            const MAX_LENGTH = 50;
+
+            document.getElementById('example-button').addEventListener('click', () => {
+                document.getElementById('result').hidden = false;
+            });
+
+            document.getElementById('example-form').addEventListener('submit', (event) => {
+                event.preventDefault();
+                const value = document.getElementById('example-input').value.trim();
+                let message = 'Form submitted successfully';
+                if (!value) message = 'Please enter a value';
+                else if (value.length > MAX_LENGTH) message = `Value must be ${MAX_LENGTH} characters or fewer`;
+                document.getElementById('message').textContent = message;
+            });
+        </script>
+    </body>
+</html>

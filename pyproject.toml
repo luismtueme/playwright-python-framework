@@ -1,0 +1,102 @@
+[project]
+name = "playwright-python-framework"
+version = "1.0.0"
+description = "Playwright test automation framework in Python: UI, API, database, accessibility and visual testing, role-based users, pytest and Playwright reporting"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "luismtueme" }]
+requires-python = ">=3.12"
+keywords = ["playwright", "pytest", "test-automation", "e2e"]
+dependencies = [
+    "hypothesis>=6.112",
+    "jsonschema>=4.23",
+    "pillow>=11.0",
+    "playwright>=1.49",
+    "pymysql>=1.1",
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "pytest-playwright>=0.6",
+    "pytest-repeat>=0.9",
+    "pytest-rerunfailures>=15.0",
+    "pytest-split>=0.10",
+    "pytest-timeout>=2.3",
+    "pytest-xdist>=3.6",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.13",
+    "ruff>=0.8",
+    "types-jsonschema>=4.26.0.20261006",
+    "types-pymysql>=1.2.0.20260923",
+    "types-pyyaml>=6.0.12.20260906",
+]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "unit"]
+pythonpath = ["."]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = [
+    "smoke: critical path, safe to run on every change",
+    "api: API behavior",
+    "db: needs a database (DB_HOST)",
+    "a11y: accessibility checks",
+    "visual: screenshot comparison; run only in Docker",
+    "perf: performance budgets",
+    "quarantine: known-flaky test that still runs and reports, with an issue marker",
+    "role(name): who the browser is logged in as (admin, viewer, or anonymous)",
+    "contract(enabled): check API responses against the OpenAPI contract",
+    "issue(ticket): ticket id required on quarantined tests",
+    "phone: lay the page out at a phone width",
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+    "ignore::ResourceWarning",
+    "ignore::pytest.PytestUnhandledThreadExceptionWarning",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["config", "contracts", "demo_app", "pages", "utils", "tests", "unit"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["config", "contracts", "demo_app", "pages", "utils"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["config", "contracts", "demo_app", "pages", "utils", "tests", "unit"]
+warn_unused_ignores = true
+plugins = []
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "unit.*"]
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = ["hypothesis.*", "pytest_split.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["config", "demo_app", "utils", "contracts"]
+omit = [
+    "utils/visual.py",
+    "utils/codegen.py",
+    "utils/run_quarantine.py",
+    "utils/affected.py",
+]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = false

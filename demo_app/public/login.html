@@ -1,0 +1,57 @@
+<!doctype html>
+<!--
+  Demo app: login page. Served by demo-app/server.js at "/login".
+  Posts to /api/login and shows the result.
+-->
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Log in | Example Application</title>
+    </head>
+    <body>
+        <main>
+            <h1>Log in</h1>
+            <form id="login-form" novalidate>
+                <label for="username">Username</label>
+                <input id="username" name="username" type="text" autocomplete="username" />
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" autocomplete="current-password" />
+                <button type="submit">Log in</button>
+            </form>
+            <p id="login-error" role="alert"></p>
+            <p id="welcome" hidden></p>
+        </main>
+
+        <script>
+            document.getElementById('login-form').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const error = document.getElementById('login-error');
+                const welcome = document.getElementById('welcome');
+                error.textContent = '';
+
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value,
+                        password: document.getElementById('password').value,
+                    }),
+                });
+                const body = await response.json();
+
+                // Only same-site paths, never "//other-host"
+                const next = new URLSearchParams(location.search).get('next');
+                if (response.ok && next && next.startsWith('/') && !next.startsWith('//')) {
+                    location.assign(next);
+                } else if (response.ok) {
+                    document.getElementById('login-form').hidden = true;
+                    welcome.textContent = `Welcome, ${body.user.username}`;
+                    welcome.hidden = false;
+                } else {
+                    error.textContent = body.error.message;
+                }
+            });
+        </script>
+    </body>
+</html>

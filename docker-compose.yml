@@ -1,0 +1,29 @@
+services:
+  tests:
+    build: .
+    environment:
+      CI: "true"
+      HEADLESS: "true"
+      IN_DOCKER: "true"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: test
+      DB_PASSWORD: test
+      DB_NAME: demo
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["uv", "run", "pytest", "-m", "not visual"]
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: demo
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20

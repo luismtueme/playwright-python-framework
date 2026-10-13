@@ -1,0 +1,38 @@
+# Environments
+.venv/
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+coverage.xml
+
+# Test artifacts
+test-results/
+playwright-report/
+html-report/
+junit.xml
+report.json
+blob-report/
+traces/
+videos/
+*.webm
+*.mp4
+
+# Saved login sessions (live cookies)
+.auth/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Local research dumps
+agent-tools/

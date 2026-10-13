@@ -1,0 +1,75 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browsers:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    env:
+      CI: "true"
+      HEADLESS: "true"
+      TEST_BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: uv sync --frozen
+      - run: uv run playwright install --with-deps ${{ matrix.browser }}
+      - run: uv run pytest -m "not visual"
+
+  devices:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - browser: chromium
+            device: Pixel 7
+          - browser: chromium
+            device: iPhone 15
+          - browser: webkit
+            device: iPhone 15
+    env:
+      CI: "true"
+      HEADLESS: "true"
+      TEST_BROWSER: ${{ matrix.browser }}
+      TEST_DEVICE: ${{ matrix.device }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: uv sync --frozen
+      - run: uv run playwright install --with-deps ${{ matrix.browser }}
+      - run: uv run pytest -m "not visual"
+
+  visual:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.63.0-noble
+    env:
+      CI: "true"
+      HEADLESS: "true"
+      IN_DOCKER: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install --quiet uv
+      - run: uv sync --frozen
+      - run: uv run python -m utils.visual

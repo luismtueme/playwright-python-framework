@@ -1,0 +1,14 @@
+.venv
+.git
+.pytest_cache
+.hypothesis
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+test-results
+playwright-report
+html-report
+.auth
+agent-tools
+**/__pycache__

@@ -1,0 +1,15 @@
+{
+  "baseUrl": "",
+  "environment": "local",
+  "browser": "chromium",
+  "headless": false,
+  "viewport": { "width": 1280, "height": 720 },
+  "timeouts": {
+    "action": 10000,
+    "navigation": 30000,
+    "expect": 5000,
+    "test": 60000
+  },
+  "video": "retain-on-failure",
+  "trace": "retain-on-failure"
+}

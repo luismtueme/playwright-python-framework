@@ -1,0 +1,125 @@
+<!doctype html>
+<!--
+  Demo app: items page. Served by demo-app/server.js at "/items".
+  Requires a session cookie (set by logging in); otherwise redirects to /login.
+-->
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Items | Example Application</title>
+    </head>
+    <body>
+        <main>
+            <h1>Items</h1>
+
+            <form id="new-item-form" novalidate>
+                <label for="item-name">New item name</label>
+                <input id="item-name" name="name" type="text" />
+                <button type="submit">Add item</button>
+            </form>
+            <p id="item-error" role="alert"></p>
+            <p id="read-only" hidden>You have read-only access.</p>
+
+            <p id="loading" hidden>Loading items…</p>
+            <div id="load-error" hidden>
+                <p>Could not load the items.</p>
+                <button type="button" id="retry">Try again</button>
+            </div>
+            <ul id="items" aria-label="Items"></ul>
+            <p id="empty" hidden>No items yet</p>
+
+            <p id="session-expired" hidden>
+                Your session has expired after 15 minutes of inactivity. <a href="/login?next=/items">Log in again</a>
+            </p>
+        </main>
+
+        <script>
+            const list = document.getElementById('items');
+
+            function render(items) {
+                list.replaceChildren(
+                    ...items.map((item) => {
+                        const li = document.createElement('li');
+                        li.textContent = item.name;
+                        li.dataset.id = item.id;
+                        return li;
+                    }),
+                );
+                document.getElementById('empty').hidden = items.length > 0;
+            }
+
+            // Network and server failures show a message instead of breaking the page
+            async function load() {
+                const loading = document.getElementById('loading');
+                const loadError = document.getElementById('load-error');
+                loading.hidden = false;
+                loadError.hidden = true;
+                try {
+                    const response = await fetch('/api/items');
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    render((await response.json()).items);
+                } catch {
+                    loadError.hidden = false;
+                } finally {
+                    loading.hidden = true;
+                }
+            }
+            document.getElementById('retry').addEventListener('click', load);
+
+            const SAVE_FAILED = 'Could not save the item. Try again.';
+            document.getElementById('new-item-form').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const input = document.getElementById('item-name');
+                const error = document.getElementById('item-error');
+                let response;
+                try {
+                    response = await fetch('/api/items', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: input.value }),
+                    });
+                } catch {
+                    error.textContent = SAVE_FAILED;
+                    return;
+                }
+                if (response.ok) {
+                    error.textContent = '';
+                    input.value = '';
+                    await load();
+                    return;
+                }
+                // 4xx messages are meant for the user; 5xx details are not
+                const body = await response.json().catch(() => null);
+                error.textContent = response.status < 500 && body?.error?.message ? body.error.message : SAVE_FAILED;
+            });
+
+            load();
+
+            // Viewers can read but not add: the API returns 403, so hide the form
+            fetch('/api/me')
+                .then((response) => response.json())
+                .then((me) => {
+                    if (me.role !== 'admin') {
+                        document.getElementById('new-item-form').hidden = true;
+                        document.getElementById('read-only').hidden = false;
+                    }
+                });
+
+            // Client-side idle timeout: any click or keypress restarts the 15-minute timer.
+            // Tests control time with Playwright's page.clock instead of waiting.
+            const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+            let idleTimer;
+            function restartIdleTimer() {
+                clearTimeout(idleTimer);
+                idleTimer = setTimeout(() => {
+                    document.getElementById('new-item-form').hidden = true;
+                    document.getElementById('session-expired').hidden = false;
+                }, IDLE_TIMEOUT_MS);
+            }
+            document.addEventListener('click', restartIdleTimer);
+            document.addEventListener('keydown', restartIdleTimer);
+            restartIdleTimer();
+        </script>
+    </body>
+</html>

@@ -1,0 +1,213 @@
+# API contract for the demo app: the single source of truth for its API.
+#
+# - contracts/models.py is generated from this file (uv run python -m utils.generate_api_types);
+#   tests use those types, so an API change here breaks type checking until the
+#   tests are updated. CI fails if the generated file is out of date.
+# - Every API response in every test is validated against this file at runtime
+#   (tests/fixtures.ts), so the app can't drift from it unnoticed.
+#
+# For your app, replace this with your API's OpenAPI document (or point
+# OPENAPI_SPEC at it; see utils/generate_api_types.py).
+openapi: 3.1.0
+info:
+  title: Demo app API
+  version: 1.0.0
+  description: Items API with session login and admin/viewer roles.
+
+paths:
+  /api/login:
+    post:
+      operationId: login
+      summary: Log in and start a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Logged in. Also sets the `session` cookie.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400': { $ref: '#/components/responses/InvalidJson' }
+        '401':
+          description: Wrong username or password
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/me:
+    get:
+      operationId: getMe
+      summary: The logged-in user
+      security: [{ bearer: [] }, { session: [] }]
+      responses:
+        '200':
+          description: The session's user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/items:
+    get:
+      operationId: listItems
+      summary: List items
+      security: [{ bearer: [] }, { session: [] }]
+      responses:
+        '200':
+          description: All items
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ItemList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: createItem
+      summary: Create an item (admin only)
+      security: [{ bearer: [] }, { session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ItemCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Item' }
+        '400':
+          description: Invalid name, or a body that isn't JSON
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/items/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      operationId: getItem
+      summary: Get one item
+      security: [{ bearer: [] }, { session: [] }]
+      responses:
+        '200':
+          description: The item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Item' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: deleteItem
+      summary: Delete an item (admin only)
+      security: [{ bearer: [] }, { session: [] }]
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer }
+    session: { type: apiKey, in: cookie, name: session }
+
+  responses:
+    Unauthorized:
+      description: No session or token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: The user's role can't do this
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such item
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    InvalidJson:
+      description: The body isn't valid JSON
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Role:
+      type: string
+      enum: [admin, viewer]
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+
+    User:
+      type: object
+      additionalProperties: false
+      required: [username, role]
+      properties:
+        username: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required: [token, user]
+      properties:
+        token: { type: string, minLength: 1 }
+        user: { $ref: '#/components/schemas/User' }
+
+    ItemCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Leading and trailing spaces are trimmed; the result must be 1-255 characters.
+
+    Item:
+      type: object
+      additionalProperties: false
+      required: [id, name, createdAt]
+      properties:
+        id: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 255 }
+        createdAt: { type: string, format: date-time }
+
+    ItemList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Item' }
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code]
+          properties:
+            code:
+              type: string
+              enum:
+                [INVALID_CREDENTIALS, INVALID_JSON, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, VALIDATION_ERROR, SERVER_ERROR]
+            message: { type: string }
+            field: { type: string }
