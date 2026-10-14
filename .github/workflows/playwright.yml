@@ -228,7 +228,7 @@ jobs:
             uv run python -m utils.pr_summary "${files[@]}" > /tmp/summary.md
           fi
       - name: Comment on the pull request
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
