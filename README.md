@@ -1,6 +1,6 @@
 # Playwright Python Framework
 
-Pytest and Playwright for UI, API, database, accessibility, and visual checks. This is the Python sibling of [playwright-typescript-framework](https://github.com/luismtueme/playwright-typescript-framework). The same ideas show up in [playwright-cucumber-typescript](https://github.com/luismtueme/playwright-cucumber-typescript), [playwright-cucumber-automation](https://github.com/luismtueme/playwright-cucumber-automation), [selenium-java-cucumber](https://github.com/luismtueme/selenium-java-cucumber), and [appium-java-cucumber](https://github.com/luismtueme/appium-java-cucumber).
+Pytest and Playwright for UI, API, database, accessibility, and visual checks. This is the Python sibling of [playwright-typescript-framework](https://github.com/luismtueme/playwright-typescript-framework). The same ideas show up in [playwright-cucumber-typescript-framework](https://github.com/luismtueme/playwright-cucumber-typescript-framework), [playwright-cucumber-automation-framework](https://github.com/luismtueme/playwright-cucumber-automation-framework), [selenium-java-cucumber-framework](https://github.com/luismtueme/selenium-java-cucumber-framework), and [appium-java-cucumber-framework](https://github.com/luismtueme/appium-java-cucumber-framework).
 
 There is no Allure and no Behave. Failures are the pytest output, a JUnit XML file, and Playwright traces, screenshots, and videos. Open a failed test with `uv run playwright show-trace test-results/<test>/trace.zip`.
 
@@ -102,7 +102,7 @@ uv run python -m utils.lint_tests
 uv run python -m utils.generate_api_types --check
 ```
 
-GitHub Actions runs Checks, a 10-times burn-in of changed tests, a four-way shard rolled up as Tests, a non-blocking quarantine step, a leftover-data check, and Visual. Those four names are the required status checks, the same set as the TypeScript framework. Nightly runs Chromium, Firefox, and WebKit, plus Pixel 7 and iPhone 15. See [GITHUB_ACTIONS_GUIDE.md](GITHUB_ACTIONS_GUIDE.md).
+GitHub Actions runs Checks, a 10-times burn-in of changed tests, a four-way shard rolled up as Tests, a non-blocking quarantine step, a leftover-data check, and Visual. Those four names are the required status checks, the same set as the TypeScript framework. Nightly runs Chromium, Firefox, and WebKit on the desktop viewport, plus Pixel 7 on Chromium and iPhone 15 on Chromium and WebKit. See [GITHUB_ACTIONS_GUIDE.md](GITHUB_ACTIONS_GUIDE.md).
 
 ## License
 
