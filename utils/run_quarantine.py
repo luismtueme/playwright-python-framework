@@ -15,6 +15,10 @@ def main() -> int:
     environment["PW_SUITE"] = "quarantine"
     environment["QUARANTINE"] = "true"
     completed = subprocess.run([sys.executable, "-m", "pytest", "tests", *sys.argv[1:]], env=environment, check=False)
+    # Pytest exits 5 when the suite has no quarantined tests. That is a pass.
+    if completed.returncode == 5:
+        print("No quarantined tests.")
+        return 0
     return completed.returncode
 
 

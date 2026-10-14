@@ -16,6 +16,7 @@ coverage.xml
 
 # Test artifacts
 test-results/
+tests/visual/__screenshots__/**/*.png
 playwright-report/
 html-report/
 junit.xml

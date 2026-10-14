@@ -10,5 +10,5 @@ First release of the Python sibling of playwright-typescript-framework.
 - UI, API, database, accessibility, performance, property, and visual tests.
 - Ruff, mypy, a test-policy linter, a scaffold, and a line-coverage gate on the framework modules.
 - Docker Compose with MySQL 8.4, and GitHub Actions for checks, burn-in, shards, quarantine, visuals, and a nightly browser and device matrix.
-
-Visual baselines are produced by `uv run python -m utils.visual --update` inside the Playwright image. They are committed after that command has been run.
+- Visual baselines for desktop, Pixel 7, and iPhone 15, committed as SHA-256 hashes so CI compares screenshot bytes instead of writing images back.
+- Required status checks named Checks, Tests, Visual, and Burn-in, matching the other frameworks.
