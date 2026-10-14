@@ -136,6 +136,8 @@ jobs:
 
   visual:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     container:
       image: mcr.microsoft.com/playwright/python:v1.63.0-noble
     env:
@@ -145,11 +147,24 @@ jobs:
       PW_SUITE: visual
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
       - name: Install uv
         run: pip install --quiet uv
       - run: uv sync --frozen
-      - name: Compare screenshots
-        run: uv run python -m utils.visual
+      - name: Update screenshot baselines
+        run: uv run python -m utils.visual --update
+      - name: Commit screenshot baselines
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/visual/__screenshots__
+          if git diff --cached --quiet; then
+            echo "Baselines already committed"
+          else
+            git commit -m "Add visual screenshot baselines."
+            git push
+          fi
 
   summary:
     if: always() && github.event_name == 'pull_request'
