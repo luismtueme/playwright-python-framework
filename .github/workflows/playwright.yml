@@ -4,13 +4,22 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
+# Least privilege by default. The summary job asks for pull-request writes.
 permissions:
   contents: read
 
+# A newer push to the same PR cancels the older run. Runs on main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   checks:
+    name: Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -31,9 +40,14 @@ jobs:
           uv export --frozen --no-dev --format requirements-txt --output-file /tmp/requirements.txt
           uvx pip-audit --requirement /tmp/requirements.txt
 
+  # Pull requests only. Skipped on a push to main, which GitHub counts as passing
+  # for the required Burn-in check.
   burn-in:
+    name: Burn-in
+    needs: checks
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,8 +75,11 @@ jobs:
           # shellcheck disable=SC2086
           uv run pytest $files --count 10 --reruns 0 -m "not visual"
 
-  tests:
+  test-shard:
+    name: Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: checks
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -102,42 +119,56 @@ jobs:
       - run: uv run playwright install --with-deps chromium
       - name: Sharded suite
         run: uv run pytest tests --splits 4 --group ${{ matrix.shard }} --junitxml=test-results/junit.xml -m "not visual"
+      # Quarantine runs once, on shard 1. A failure is reported and does not fail the shard.
+      - name: Run quarantined tests
+        if: ${{ !cancelled() && matrix.shard == 1 }}
+        continue-on-error: true
+        env:
+          RETRIES: "0"
+        run: uv run python -m utils.run_quarantine --reruns 0
       - name: Leftover data
-        if: always()
+        if: ${{ !cancelled() }}
         run: uv run python -m utils.check_leftover_data
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() }}
         with:
           name: report-shard-${{ matrix.shard }}
           path: |
             test-results/report.json
             test-results/junit.xml
           if-no-files-found: ignore
+          retention-days: 14
 
-  quarantine:
+  # Required check. The matrix jobs are named "Tests (shard N/4)", so this job
+  # is the single status check called Tests.
+  tests:
+    name: Tests
+    needs: test-shard
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
-    continue-on-error: true
-    env:
-      CI: "true"
-      HEADLESS: "true"
-      PW_SUITE: quarantine
-      RETRIES: "0"
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - name: Download shard reports
+        uses: actions/download-artifact@v4
         with:
-          enable-cache: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version-file: .python-version
-      - run: uv sync --frozen
-      - run: uv run playwright install --with-deps chromium
-      - run: uv run pytest tests --reruns 0
+          pattern: report-shard-*
+          path: reports
+      - name: Require every shard report
+        run: |
+          count=$(find reports -name 'junit.xml' | wc -l)
+          echo "Shard reports: $count"
+          test "$count" -eq 4
+      - name: Fail if any shard failed
+        if: ${{ needs.test-shard.result != 'success' }}
+        run: |
+          echo "A test shard failed (result: ${{ needs.test-shard.result }})."
+          exit 1
 
   visual:
+    name: Visual
+    needs: checks
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    timeout-minutes: 15
     container:
       image: mcr.microsoft.com/playwright/python:v1.63.0-noble
     env:
@@ -147,28 +178,24 @@ jobs:
       PW_SUITE: visual
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ github.token }}
       - name: Install uv
         run: pip install --quiet uv
       - run: uv sync --frozen
-      - name: Update screenshot baselines
-        run: uv run python -m utils.visual --update
-      - name: Commit screenshot baselines
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tests/visual/__screenshots__
-          if git diff --cached --quiet; then
-            echo "Baselines already committed"
-          else
-            git commit -m "Add visual screenshot baselines."
-            git push
-          fi
+      - name: Compare screenshots
+        run: uv run python -m utils.visual
+      - name: Upload visual diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: tests/visual/__screenshots__/**/*-actual.png
+          if-no-files-found: ignore
+          retention-days: 14
 
   summary:
+    name: Summary
     if: always() && github.event_name == 'pull_request'
-    needs: [checks, burn-in, tests, quarantine, visual]
+    needs: [checks, burn-in, tests, visual]
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
