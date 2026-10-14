@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   browsers:
+    name: Tests (${{ matrix.browser }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -32,6 +33,7 @@ jobs:
       - run: uv run pytest -m "not visual"
 
   devices:
+    name: Tests (${{ matrix.device }} / ${{ matrix.browser }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -61,6 +63,7 @@ jobs:
       - run: uv run pytest -m "not visual"
 
   visual:
+    name: Visual (nightly)
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright/python:v1.63.0-noble
