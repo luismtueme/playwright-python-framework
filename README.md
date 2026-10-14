@@ -89,7 +89,7 @@ uv run python -m utils.visual --update   # write baselines, then commit tests/vi
 uv run python -m utils.visual            # compare
 ```
 
-Baselines are not in the repo until that Docker command has been run once. Until then the visual job fails with "Missing baseline".
+Committed baselines live in `tests/visual/__screenshots__/` as `*.png.sha256` for desktop, Pixel 7, and iPhone 15. CI compares the screenshot bytes to that hash. A local `.png` or `.png.b64` next to it is compared with a few pixels of slack instead. Update them with the Docker command above and commit the new `.png.sha256` files.
 
 ## Checks
 
@@ -102,7 +102,7 @@ uv run python -m utils.lint_tests
 uv run python -m utils.generate_api_types --check
 ```
 
-GitHub Actions runs those checks, a 10-times burn-in of changed tests, a four-way shard of the suite, a non-blocking quarantine job, a leftover-data check, and the visual job. Nightly runs Chromium, Firefox, and WebKit, plus Pixel 7 and iPhone 15. See [GITHUB_ACTIONS_GUIDE.md](GITHUB_ACTIONS_GUIDE.md).
+GitHub Actions runs Checks, a 10-times burn-in of changed tests, a four-way shard rolled up as Tests, a non-blocking quarantine step, a leftover-data check, and Visual. Those four names are the required status checks, the same set as the TypeScript framework. Nightly runs Chromium, Firefox, and WebKit, plus Pixel 7 and iPhone 15. See [GITHUB_ACTIONS_GUIDE.md](GITHUB_ACTIONS_GUIDE.md).
 
 ## License
 
