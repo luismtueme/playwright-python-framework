@@ -11,6 +11,7 @@ from utils.generate_api_types import TARGET, load_document, render_models
 from utils.logger import create_logger
 from utils.performance import measure_page, over_budget
 from utils.pr_summary import COMMENT_MARKER, merge_reports, render_summary
+from utils.run_quarantine import main as run_quarantine
 from utils.screenshots import expect_screenshot, pixel_difference, snapshot_path
 from utils.test_data import Random, item_name, parse_seed, seed_for
 
@@ -195,6 +196,17 @@ def test_measure_page_and_accessibility_and_screenshots(monkeypatch: pytest.Monk
     assert pixel_difference(_png((0, 0, 0)), _png((0, 0, 0))) == 0
     assert pixel_difference(_png((0, 0, 0)), _png((255, 0, 0))) == 4
     assert snapshot_path("form-page.png").name == "form-page.png"
+
+
+def test_quarantine_runner_treats_an_empty_suite_as_success(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    class _Done:
+        returncode = 5
+
+    monkeypatch.setattr("utils.run_quarantine.subprocess.run", lambda *args, **kwargs: _Done())
+    assert run_quarantine() == 0
+    assert "No quarantined tests." in capsys.readouterr().out
 
 
 def test_generated_models_match_the_contract() -> None:

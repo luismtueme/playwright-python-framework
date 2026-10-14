@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import io
 import json
 from datetime import datetime
@@ -258,6 +260,15 @@ def test_screenshots_missing_mismatch_and_device(monkeypatch: pytest.MonkeyPatch
     baseline.write_bytes(_png((9, 9, 9), (4, 4)))
     with pytest.raises(AssertionError, match="differs"):
         expect_screenshot(_Page(), "home.png")  # type: ignore[arg-type]
+    encoded = tmp_path / "encoded.png.b64"
+    encoded.write_text(base64.b64encode(_png((1, 2, 3), (4, 4))).decode("ascii") + "\n", encoding="utf-8")
+    expect_screenshot(_Page(), "encoded.png")  # type: ignore[arg-type]
+    digest = tmp_path / "hashed.png.sha256"
+    digest.write_text(hashlib.sha256(_png((1, 2, 3), (4, 4))).hexdigest() + "\n", encoding="utf-8")
+    expect_screenshot(_Page(), "hashed.png")  # type: ignore[arg-type]
+    digest.write_text("0" * 64 + "\n", encoding="utf-8")
+    with pytest.raises(AssertionError, match="hash"):
+        expect_screenshot(_Page(), "hashed.png")  # type: ignore[arg-type]
     assert pixel_difference(_png((0, 0, 0), (1, 1)), _png((0, 0, 0), (2, 2))) == 1
     assert _device_folder("Pixel 7") == "pixel-7"
     assert _device_folder(None) == "desktop"
