@@ -25,6 +25,7 @@ Nightly is not a required check.
 
 - Chromium, Firefox, and WebKit on the desktop viewport.
 - Pixel 7 and iPhone 15 on Chromium, and iPhone 15 on WebKit. Firefox has no mobile emulation, so it is not in the device matrix.
+- Each browser job runs `pytest tests` with `--browser` (and `--device` for the phones) and MySQL 8.4, same database settings as the pull-request shards. Unit tests stay on Checks.
 - The same visual comparison as the pull-request workflow.
 
 ## Local Docker

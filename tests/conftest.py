@@ -72,6 +72,13 @@ def pytest_load_initial_conftests(early_config: pytest.Config, parser: pytest.Pa
 
 def pytest_configure(config: pytest.Config) -> None:
     global _demo
+    # pytest_load_initial_conftests does not run from a conftest, so TEST_BROWSER
+    # and TEST_DEVICE never become CLI flags on their own. Set them before
+    # collection parametrizes browser_name. An explicit --browser/--device wins.
+    if not config.getoption("--browser"):
+        config.option.browser = [app_config.browser]
+    if app_config.device and not config.getoption("--device"):
+        config.option.device = app_config.device
     expect.set_options(timeout=app_config.timeouts.expect)
     if not config.option.markexpr:
         suite = os.environ.get("PW_SUITE", "default")
