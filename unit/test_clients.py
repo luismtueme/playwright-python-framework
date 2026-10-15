@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+from collections.abc import Callable
 from typing import Any
 
 import pymysql
@@ -10,42 +12,68 @@ from utils.api_client import ApiClient, redact
 from utils.db_client import DbClient
 
 
+def _using_playwright(check: Callable[[Any], None]) -> None:
+    """Run sync Playwright on a thread that has no asyncio loop.
+
+    The suite session already owns a sync driver. A second sync_playwright()
+    on that thread raises "Sync API inside the asyncio loop".
+    """
+    from playwright.sync_api import sync_playwright
+
+    errors: list[Exception] = []
+
+    def target() -> None:
+        try:
+            with sync_playwright() as playwright:
+                check(playwright)
+        except Exception as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    if errors:
+        raise errors[0]
+
+
 def test_redact_masks_secrets_and_keeps_other_fields() -> None:
     masked = redact({"password": "secret", "name": "Manhole", "nested": [{"api_key": "k"}]})
     assert masked == {"password": "***", "name": "Manhole", "nested": [{"api_key": "***"}]}
 
 
 def test_api_client_logs_in_and_creates_an_item() -> None:
-    from playwright.sync_api import sync_playwright
-
     demo = start_demo_app(port=0)
+
+    def check(playwright: Any) -> None:
+        client = ApiClient.create(playwright, base_url=demo.url)
+        try:
+            logged_in = client.login("demo", "demo-password")
+            assert logged_in.status == 200
+            created = client.post("/api/items", {"name": "Lateral 3 cleaning"})
+            assert created.status == 201
+            assert created.body["name"] == "Lateral 3 cleaning"
+        finally:
+            client.dispose()
+
     try:
-        with sync_playwright() as playwright:
-            client = ApiClient.create(playwright, base_url=demo.url)
-            try:
-                logged_in = client.login("demo", "demo-password")
-                assert logged_in.status == 200
-                created = client.post("/api/items", {"name": "Lateral 3 cleaning"})
-                assert created.status == 201
-                assert created.body["name"] == "Lateral 3 cleaning"
-            finally:
-                client.dispose()
+        _using_playwright(check)
     finally:
         demo.close()
 
 
 def test_api_client_reports_a_failed_login() -> None:
-    from playwright.sync_api import sync_playwright
-
     demo = start_demo_app(port=0)
+
+    def check(playwright: Any) -> None:
+        client = ApiClient.create(playwright, base_url=demo.url)
+        try:
+            with pytest.raises(RuntimeError, match="Login failed"):
+                client.login("demo", "nope")
+        finally:
+            client.dispose()
+
     try:
-        with sync_playwright() as playwright:
-            client = ApiClient.create(playwright, base_url=demo.url)
-            try:
-                with pytest.raises(RuntimeError, match="Login failed"):
-                    client.login("demo", "nope")
-            finally:
-                client.dispose()
+        _using_playwright(check)
     finally:
         demo.close()
 

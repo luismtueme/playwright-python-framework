@@ -12,3 +12,4 @@ First release of the Python sibling of playwright-typescript-framework.
 - Docker Compose with MySQL 8.4, and GitHub Actions for checks, burn-in, shards, quarantine, visuals, and a nightly browser and device matrix.
 - Visual baselines for desktop, Pixel 7, and iPhone 15, committed as SHA-256 hashes so CI compares screenshot bytes instead of writing images back.
 - Required status checks named Checks, Tests, Visual, and Burn-in, matching the other frameworks.
+- Nightly runs `pytest tests` per browser and device, with MySQL, instead of one pytest command that also collected unit tests and always launched Chromium.
