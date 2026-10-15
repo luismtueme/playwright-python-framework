@@ -16,10 +16,30 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: demo
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     env:
       CI: "true"
       HEADLESS: "true"
       TEST_BROWSER: ${{ matrix.browser }}
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_USER: test
+      DB_PASSWORD: test
+      DB_NAME: demo
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -30,7 +50,8 @@ jobs:
           python-version-file: .python-version
       - run: uv sync --frozen
       - run: uv run playwright install --with-deps ${{ matrix.browser }}
-      - run: uv run pytest -m "not visual"
+      - name: Browser suite
+        run: uv run pytest tests --browser ${{ matrix.browser }} -m "not visual"
 
   devices:
     name: Tests (${{ matrix.device }} / ${{ matrix.browser }})
@@ -45,11 +66,31 @@ jobs:
             device: iPhone 15
           - browser: webkit
             device: iPhone 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: demo
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     env:
       CI: "true"
       HEADLESS: "true"
       TEST_BROWSER: ${{ matrix.browser }}
       TEST_DEVICE: ${{ matrix.device }}
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_USER: test
+      DB_PASSWORD: test
+      DB_NAME: demo
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -60,7 +101,8 @@ jobs:
           python-version-file: .python-version
       - run: uv sync --frozen
       - run: uv run playwright install --with-deps ${{ matrix.browser }}
-      - run: uv run pytest -m "not visual"
+      - name: Device suite
+        run: uv run pytest tests --browser ${{ matrix.browser }} --device "${{ matrix.device }}" -m "not visual"
 
   visual:
     name: Visual (nightly)
