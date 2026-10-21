@@ -129,7 +129,7 @@ jobs:
       - name: Leftover data
         if: ${{ !cancelled() }}
         run: uv run python -m utils.check_leftover_data
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: report-shard-${{ matrix.shard }}
@@ -185,7 +185,7 @@ jobs:
         run: uv run python -m utils.visual
       - name: Upload visual diffs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: visual-diffs
           path: tests/visual/__screenshots__/**/*-actual.png
